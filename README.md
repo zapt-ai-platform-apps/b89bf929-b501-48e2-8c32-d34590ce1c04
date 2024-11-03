@@ -1,72 +1,74 @@
 # New App
 
-## Description
-
-New App is a messaging application that allows users to communicate in real-time with each other. The app includes features such as user authentication, message persistence, message timestamps, and a modern UI design. Users can see who is online and engage in conversations with other registered users.
+New App is a modern real-time messaging application that allows users to chat with each other instantly. It features user authentication, message persistence, timestamps, online user indicators, and a user-friendly interface.
 
 ## User Journeys
 
-### 1. User Registration and Authentication
+### 1. Sign In
 
-1. The user opens the app and sees the Sign in with ZAPT interface.
-2. The user clicks on one of the available sign-in methods (Google, Facebook, Apple, or Magic Link).
-3. Upon successful authentication, the user is redirected to the home page.
+- When the user opens the app, they are greeted with a sign-in screen.
+- The user sees the text "Sign in with ZAPT" above the authentication form.
+- Below, there is a link to [ZAPT](https://www.zapt.ai) that opens in a new tab.
+- The user can sign in using email (magic link) or social providers like Google, Facebook, or Apple.
+  
+### 2. Real-Time Chatting
 
-### 2. Viewing Users
+- After signing in, the user is redirected to the chat interface.
+- The chat interface displays the list of messages in real-time.
+- Messages sent by the user appear aligned to the right with a distinct background color.
+- Messages sent by other users appear aligned to the left.
+- Each message displays the content and the timestamp of when it was sent.
+- At the top, the user can see the number of online users currently in the chat.
+  
+### 3. Sending Messages
 
-1. On the home page, the user sees a list of other registered users.
-2. The user can scroll through the list to find someone to chat with.
-3. Presence indicators show which users are currently online.
+- The user can type a message into the input field at the bottom of the chat.
+- After typing a message, the user clicks the "Send" button to send the message.
+- The message is sent to the server, stored in the database, and broadcast in real-time to all connected users.
+- The new message appears immediately in the chat interface for all users.
 
-### 3. Starting a Chat
+### 4. User Presence
 
-1. The user clicks on another user's name from the list.
-2. The chat interface opens, displaying past messages between the two users (if any).
-3. Messages are ordered chronologically with timestamps.
+- The app displays the number of online users in the chat interface.
+- When a user joins or leaves the chat, the online user count updates in real-time.
 
-### 4. Sending Messages
+### 5. Sign Out
 
-1. The user types a message into the input field at the bottom of the chat.
-2. The user clicks the "Send" button to send the message.
-3. The message appears in the chat window, and the recipient can see it in real-time.
+- The user can sign out by clicking the "Sign Out" button at the top of the chat interface.
+- After signing out, the user is redirected back to the sign-in screen.
 
-### 5. Receiving Messages
+## External APIs and Services
 
-1. When the other user sends a message, it appears in the chat window without needing to refresh.
-2. The app checks for new messages every few seconds to provide a near real-time experience.
+- **Pusher**: Used for real-time messaging functionality, including message broadcasting and user presence indicators.
+- **Neon Database**: Used with Drizzle ORM for storing and retrieving messages in a PostgreSQL database.
+- **Supabase Authentication**: Used for user authentication, allowing users to sign in with email or social providers.
+- **Sentry**: Used for error logging and monitoring in both the frontend and backend.
 
-### 6. Message Timestamps
+## Required Environment Variables
 
-1. Each message displays the time it was sent.
-2. This allows users to keep track of the conversation flow.
+Please set the following environment variables for the app to function correctly:
 
-### 7. Read Receipts
+### Frontend (.env file)
 
-1. Messages include indicators showing whether they have been read by the recipient.
-2. When the recipient views the message, the read receipt updates accordingly.
+- `VITE_PUBLIC_APP_ID`: Your ZAPT app ID.
+- `VITE_PUBLIC_SENTRY_DSN`: Sentry DSN for the frontend.
+- `VITE_PUBLIC_APP_ENV`: Application environment (e.g., `production`, `development`).
+- `VITE_PUBLIC_PUSHER_KEY`: Pusher app key.
+- `VITE_PUBLIC_PUSHER_CLUSTER`: Pusher app cluster.
 
-### 8. User Presence Indicators
+### Backend (Environment Variables)
 
-1. Users can see which contacts are online through presence indicators next to their names.
-2. This helps users know when others are available to chat.
+- `PROJECT_ID`: Your project ID.
+- `VITE_PUBLIC_SENTRY_DSN`: Sentry DSN for the backend.
+- `VITE_PUBLIC_APP_ENV`: Application environment.
+- `NEON_DB_URL`: Connection string for the Neon PostgreSQL database.
+- `PUSHER_APP_ID`: Pusher app ID.
+- `PUSHER_KEY`: Pusher app key.
+- `PUSHER_SECRET`: Pusher app secret.
+- `PUSHER_CLUSTER`: Pusher app cluster.
 
-### 9. Signing Out
+## Notes
 
-1. The user can sign out by clicking the "Sign Out" button at the top of the page.
-2. The user is returned to the login screen.
-
-## External API Services
-
-- **Supabase Auth**: Used for user authentication. It allows users to sign in using various providers and manages session handling.
-- **Neon Database via Drizzle ORM**: Used for message persistence. All messages are stored in a PostgreSQL database hosted on Neon and accessed through Drizzle ORM.
-
-## Environment Variables
-
-The app requires the following environment variables:
-
-- `VITE_PUBLIC_SENTRY_DSN`: The DSN for Sentry error logging.
-- `VITE_PUBLIC_APP_ENV`: The environment (e.g., development, production).
-- `VITE_PUBLIC_APP_ID`: The application ID used by ZAPT and Progressier.
-- `NEON_DB_URL`: The connection URL for the Neon database.
-- `SUPABASE_SERVICE_ROLE_KEY`: The service role key for Supabase admin functions.
-- `PROJECT_ID`: The project ID for Sentry logging.
+- The app is responsive and works well on different screen sizes.
+- All buttons have hover effects and are optimized for a user-friendly experience.
+- Please ensure all environment variables are properly set before running the app.

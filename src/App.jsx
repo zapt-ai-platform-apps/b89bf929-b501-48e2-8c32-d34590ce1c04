@@ -1,14 +1,16 @@
-import { createSignal, onMount, createEffect, Show } from 'solid-js';
+import { createSignal, onMount, createEffect, For, Show } from 'solid-js';
 import { supabase } from './supabaseClient';
 import { Auth } from '@supabase/auth-ui-solid';
 import { ThemeSupa } from '@supabase/auth-ui-shared';
-import Chat from './components/Chat';
-import UserList from './components/UserList';
+import Pusher from 'pusher-js';
 
 function App() {
   const [user, setUser] = createSignal(null);
   const [currentPage, setCurrentPage] = createSignal('login');
-  const [chatUserId, setChatUserId] = createSignal(null);
+  const [messages, setMessages] = createSignal([]);
+  const [newMessage, setNewMessage] = createSignal('');
+  const [loading, setLoading] = createSignal(false);
+  const [onlineUsers, setOnlineUsers] = createSignal([]);
 
   const checkUserSignedIn = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -18,9 +20,9 @@ function App() {
     }
   };
 
-  onMount(checkUserSignedIn);
+  onMount(() => {
+    checkUserSignedIn();
 
-  createEffect(() => {
     const { data: authListener } = supabase.auth.onAuthStateChange((_, session) => {
       if (session?.user) {
         setUser(session.user);
@@ -32,7 +34,7 @@ function App() {
     });
 
     return () => {
-      authListener.unsubscribe();
+      authListener?.unsubscribe();
     };
   });
 
@@ -42,8 +44,95 @@ function App() {
     setCurrentPage('login');
   };
 
+  // Fetch messages
+  const fetchMessages = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    const response = await fetch('/api/getMessages', {
+      headers: {
+        'Authorization': `Bearer ${session.access_token}`
+      }
+    });
+    if (response.ok) {
+      const data = await response.json();
+      setMessages(data);
+    } else {
+      console.error('Error fetching messages:', response.statusText);
+    }
+  };
+
+  createEffect(() => {
+    if (!user()) return;
+    fetchMessages();
+
+    // Setup Pusher
+    const pusher = new Pusher(import.meta.env.VITE_PUBLIC_PUSHER_KEY, {
+      cluster: import.meta.env.VITE_PUBLIC_PUSHER_CLUSTER,
+      authEndpoint: '/api/pusher/auth',
+      auth: {
+        headers: {
+          'Authorization': `Bearer ${supabase.auth.session()?.access_token}`,
+        },
+      },
+    });
+
+    const channel = pusher.subscribe('presence-chat');
+
+    channel.bind('message', (data) => {
+      setMessages((prevMessages) => [...prevMessages, data]);
+    });
+
+    channel.bind('pusher:subscription_succeeded', (members) => {
+      const users = [];
+      members.each((member) => {
+        users.push(member.info.name || member.id);
+      });
+      setOnlineUsers(users);
+    });
+
+    channel.bind('pusher:member_added', (member) => {
+      setOnlineUsers((prevUsers) => [...prevUsers, member.info.name || member.id]);
+    });
+
+    channel.bind('pusher:member_removed', (member) => {
+      setOnlineUsers((prevUsers) => prevUsers.filter((user) => user !== (member.info.name || member.id)));
+    });
+
+    return () => {
+      pusher.unsubscribe('presence-chat');
+    };
+  });
+
+  const sendMessage = async (e) => {
+    e.preventDefault();
+    if (!newMessage()) return;
+    setLoading(true);
+
+    const { data: { session } } = await supabase.auth.getSession();
+
+    try {
+      const response = await fetch('/api/postMessage', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ content: newMessage() })
+      });
+
+      if (response.ok) {
+        setNewMessage('');
+      } else {
+        console.error('Error sending message');
+      }
+    } catch (error) {
+      console.error('Error sending message:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <div class="min-h-screen bg-gradient-to-br from-purple-100 to-blue-100 p-4">
+    <div class="min-h-screen bg-gray-100 p-4">
       <Show
         when={currentPage() === 'homePage'}
         fallback={
@@ -71,32 +160,49 @@ function App() {
           </div>
         }
       >
-        <div class="max-w-6xl mx-auto h-full">
-          <div class="flex justify-between items-center mb-8">
-            <h1 class="text-4xl font-bold text-purple-600">New App</h1>
-            <button
-              class="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-6 rounded-full shadow-md focus:outline-none focus:ring-2 focus:ring-red-400 transition duration-300 ease-in-out transform hover:scale-105 cursor-pointer"
-              onClick={handleSignOut}
-            >
-              Sign Out
-            </button>
-          </div>
-
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-8 h-full">
-            <div class="col-span-1 bg-white rounded-lg shadow-md p-4 overflow-y-auto">
-              <h2 class="text-2xl font-bold mb-4 text-purple-600">Users</h2>
-              <UserList currentUser={user()} setChatUserId={setChatUserId} />
+        <div class="max-w-4xl mx-auto h-full flex flex-col">
+          <div class="flex justify-between items-center mb-4">
+            <h1 class="text-2xl font-bold text-purple-600">Real-Time Chat</h1>
+            <div>
+              <span class="text-gray-600 mr-4">Online Users: {onlineUsers().length}</span>
+              <button
+                class="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-full shadow-md focus:outline-none focus:ring-2 focus:ring-red-400 transition duration-300 ease-in-out transform hover:scale-105 cursor-pointer"
+                onClick={handleSignOut}
+              >
+                Sign Out
+              </button>
             </div>
-            <div class="col-span-1 md:col-span-2 bg-white rounded-lg shadow-md p-4 h-full flex flex-col">
-              <Show when={chatUserId()} fallback={
-                <div class="h-full flex items-center justify-center">
-                  <p class="text-gray-500">Select a user to start chatting</p>
+          </div>
+          <div class="flex-1 bg-white rounded-lg shadow-md p-4 overflow-auto mb-4">
+            <For each={messages()}>
+              {(message) => (
+                <div class={`mb-2 ${message.userId === user().id ? 'text-right' : 'text-left'}`}>
+                  <div class={`inline-block rounded-lg px-4 py-2 ${message.userId === user().id ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-800'}`}>
+                    <p>{message.content}</p>
+                  </div>
+                  <div class="text-xs text-gray-500 mt-1">
+                    {new Date(message.createdAt).toLocaleTimeString()}
+                  </div>
                 </div>
-              }>
-                <Chat currentUser={user()} chatUserId={chatUserId()} />
-              </Show>
-            </div>
+              )}
+            </For>
           </div>
+          <form onSubmit={sendMessage} class="flex items-center">
+            <input
+              type="text"
+              placeholder="Type your message..."
+              value={newMessage()}
+              onInput={(e) => setNewMessage(e.target.value)}
+              class="flex-1 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-400 focus:border-transparent box-border"
+            />
+            <button
+              type="submit"
+              class={`ml-4 bg-purple-500 hover:bg-purple-600 text-white font-semibold py-2 px-6 rounded-full shadow-md focus:outline-none focus:ring-2 focus:ring-purple-400 transition duration-300 ease-in-out transform hover:scale-105 cursor-pointer ${loading() ? 'opacity-50 cursor-not-allowed' : ''}`}
+              disabled={loading()}
+            >
+              {loading() ? 'Sending...' : 'Send'}
+            </button>
+          </form>
         </div>
       </Show>
     </div>
